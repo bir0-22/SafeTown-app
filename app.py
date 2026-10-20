@@ -11,10 +11,10 @@ st.set_page_config(
     layout="wide"
 )
 
-# ---------- RESTORE SETTINGS MENU & FIX THEME CONTRAST ----------
+# ---------- RESTORE SETTINGS MENU & RESPONSIVE MOBILE CSS ----------
 st.markdown("""
 <style>
-    /* Unhide top header bar & make transparent so Theme Toggle (Settings) works */
+    /* 1. Unhide top header bar & make transparent so Theme Toggle (Settings) works */
     header[data-testid="stHeader"] {
         background-color: transparent !important;
         z-index: 99999 !important;
@@ -24,7 +24,7 @@ st.markdown("""
         height: 0px;
     }
 
-    /* Page Padding */
+    /* Page Padding for Desktop */
     .block-container {
         padding-top: 2.8rem !important;
         padding-bottom: 1rem !important;
@@ -200,6 +200,73 @@ st.markdown("""
         border: 1px solid #38BDF8 !important;
         box-shadow: 0 4px 12px rgba(2, 132, 199, 0.4) !important;
     }
+
+    /* =========================================================
+       MOBILE PHONE OPTIMIZATIONS (@media max-width: 768px)
+       ========================================================= */
+    @media (max-width: 768px) {
+        .block-container {
+            padding-top: 2.2rem !important;
+            padding-left: 0.75rem !important;
+            padding-right: 0.75rem !important;
+        }
+
+        /* Compact Header for Phones */
+        .glossy-header {
+            padding: 1rem 1.25rem !important;
+            border-radius: 16px !important;
+            margin-bottom: 0.8rem !important;
+        }
+        .header-title {
+            font-size: 1.35rem !important;
+        }
+        .header-sub {
+            font-size: 0.78rem !important;
+        }
+
+        /* Force 2x2 Side-by-Side Grid for Metric Cards on Phones */
+        div[data-testid="stHorizontalBlock"]:first-of-type {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important;
+            gap: 10px !important;
+        }
+        div[data-testid="stHorizontalBlock"]:first-of-type > div[data-testid="stColumn"] {
+            width: 100% !important;
+            min-width: 0 !important;
+        }
+
+        /* Compact Metric Card Sizing */
+        .glossy-metric-card {
+            padding: 0.75rem 0.85rem !important;
+            border-radius: 14px !important;
+            min-height: 85px !important;
+        }
+        .metric-card-title {
+            font-size: 0.68rem !important;
+            margin-bottom: 0.2rem !important;
+            letter-spacing: 0.2px !important;
+        }
+        .metric-card-value {
+            font-size: 1.55rem !important;
+        }
+        .metric-card-badge {
+            font-size: 0.6rem !important;
+            padding: 2px 6px !important;
+            margin-top: 0.25rem !important;
+        }
+
+        /* Compact Mobile Dashboard Containers */
+        div[data-testid="stContainer"] {
+            padding: 0.9rem !important;
+            border-radius: 16px !important;
+        }
+
+        /* Prevent Tab Label Clipping on Narrow Phone Screens */
+        button[data-baseweb="tab"] {
+            padding: 5px 8px !important;
+            font-size: 0.74rem !important;
+        }
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -242,19 +309,14 @@ TOWNSHIP_LOCATIONS = {
 # ---------- DEMO RESIDENT DATABASE ----------
 RESIDENT_PROFILES = {
     "RES-8821": {
-        "Name": "Ahmad Ariff",
+        "Name": "Tan Sri Ahmad / Grandma Rose",
         "Emergency Contact": "Farah Ahmad (Daughter)",
         "Phone": "+60 12-345 6789"
     },
     "RES-4032": {
-        "Name": "Wong Jun Kai",
+        "Name": "Uncle Wong",
         "Emergency Contact": "Wong Jun Wai (Son)",
         "Phone": "+60 17-888 9900"
-    },
-    "RES-4132": {
-        "Name": "Karthick Raman",
-        "Emergency Contact": "Adithyaa Raman (Son)",
-        "Phone": "+60 17-888 7700"
     }
 }
 
@@ -463,9 +525,9 @@ with left:
             ).add_to(nav_map)
 
             st_folium(
-                nav_map,
-                height=280,
-                width=None,
+                nav_map, 
+                height=280, 
+                width=None, 
                 use_container_width=True,
                 key="safe_nav_map",
                 returned_objects=[]
