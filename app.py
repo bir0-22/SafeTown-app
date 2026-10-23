@@ -4,6 +4,8 @@ from datetime import datetime
 import time
 import folium
 from streamlit_folium import st_folium
+import json
+import os
 
 st.set_page_config(
     page_title="SafeTown | Smart Township Navigation",
@@ -11,10 +13,37 @@ st.set_page_config(
     layout="wide"
 )
 
+# ---------- DATA PERSISTENCE HELPERS ----------
+DATA_FILE = "incidents.json"
+
+def load_incidents():
+    if os.path.exists(DATA_FILE):
+        try:
+            with open(DATA_FILE, "r") as f:
+                data = json.load(f)
+                for inc in data:
+                    if isinstance(inc.get("Timestamp"), str):
+                        inc["Timestamp"] = datetime.fromisoformat(inc["Timestamp"])
+                return data
+        except Exception:
+            return []
+    return []
+
+def save_incidents():
+    data_to_save = []
+    for inc in st.session_state.incidents:
+        inc_copy = inc.copy()
+        if isinstance(inc_copy.get("Timestamp"), datetime):
+            inc_copy["Timestamp"] = inc_copy["Timestamp"].isoformat()
+        data_to_save.append(inc_copy)
+    
+    # Save quietly without triggering unnecessary re-renders
+    with open(DATA_FILE, "w") as f:
+        json.dump(data_to_save, f, indent=2)
+
 # ---------- RESTORE SETTINGS MENU & RESPONSIVE MOBILE CSS ----------
 st.markdown("""
 <style>
-    /* 1. Unhide top header bar & make transparent so Theme Toggle (Settings) works */
     header[data-testid="stHeader"] {
         background-color: transparent !important;
         z-index: 99999 !important;
@@ -24,7 +53,6 @@ st.markdown("""
         height: 0px;
     }
 
-    /* Page Padding for Desktop */
     .block-container {
         padding-top: 2.8rem !important;
         padding-bottom: 1rem !important;
@@ -32,7 +60,6 @@ st.markdown("""
         padding-right: 1.5rem !important;
     }
 
-    /* MAIN HEADER CARD: Deep Navy -> Royal Blue -> Teal Glossy 3D Card */
     .glossy-header {
         background: linear-gradient(135deg, #0A192F 0%, #1E3A8A 50%, #0D9488 100%);
         border-radius: 22px;
@@ -73,7 +100,6 @@ st.markdown("""
         font-weight: 500;
     }
 
-    /* GLOSSY 3D METRIC BUBBLE CARDS */
     .glossy-metric-card {
         border-radius: 20px;
         padding: 1.25rem 1.4rem;
@@ -125,7 +151,6 @@ st.markdown("""
         box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     }
 
-    /* Metric Card Color Variations */
     .metric-sapphire {
         background: linear-gradient(135deg, #1E3A8A 0%, #2563EB 50%, #06B6D4 100%);
         border: 1px solid #60A5FA;
@@ -163,7 +188,6 @@ st.markdown("""
             inset 0 -3px 6px 0px rgba(0, 0, 0, 0.4);
     }
 
-    /* DASHBOARD PANELS (DARK SLATE GLOSS FOR HIGH CONTRAST) */
     div[data-testid="stContainer"] {
         background: linear-gradient(160deg, #0F172A 0%, #1E293B 100%) !important;
         border-radius: 22px !important;
@@ -176,7 +200,6 @@ st.markdown("""
         padding: 1.3rem !important;
     }
 
-    /* Typography Contrast Inside Panels */
     div[data-testid="stContainer"] h1, 
     div[data-testid="stContainer"] h2, 
     div[data-testid="stContainer"] h3, 
@@ -187,7 +210,6 @@ st.markdown("""
         color: #F8FAFC !important;
     }
 
-    /* Glossy Tab Buttons */
     button[data-baseweb="tab"] {
         color: #94A3B8 !important;
         font-weight: 700 !important;
@@ -201,9 +223,6 @@ st.markdown("""
         box-shadow: 0 4px 12px rgba(2, 132, 199, 0.4) !important;
     }
 
-    /* =========================================================
-       MOBILE PHONE OPTIMIZATIONS (@media max-width: 768px)
-       ========================================================= */
     @media (max-width: 768px) {
         .block-container {
             padding-top: 2.2rem !important;
@@ -211,7 +230,6 @@ st.markdown("""
             padding-right: 0.75rem !important;
         }
 
-        /* Compact Header for Phones */
         .glossy-header {
             padding: 1rem 1.25rem !important;
             border-radius: 16px !important;
@@ -224,7 +242,6 @@ st.markdown("""
             font-size: 0.78rem !important;
         }
 
-        /* Force 2x2 Side-by-Side Grid for Metric Cards on Phones */
         div[data-testid="stHorizontalBlock"]:first-of-type {
             display: grid !important;
             grid-template-columns: 1fr 1fr !important;
@@ -235,7 +252,6 @@ st.markdown("""
             min-width: 0 !important;
         }
 
-        /* Compact Metric Card Sizing */
         .glossy-metric-card {
             padding: 0.75rem 0.85rem !important;
             border-radius: 14px !important;
@@ -255,13 +271,11 @@ st.markdown("""
             margin-top: 0.25rem !important;
         }
 
-        /* Compact Mobile Dashboard Containers */
         div[data-testid="stContainer"] {
             padding: 0.9rem !important;
             border-radius: 16px !important;
         }
 
-        /* Prevent Tab Label Clipping on Narrow Phone Screens */
         button[data-baseweb="tab"] {
             padding: 5px 8px !important;
             font-size: 0.74rem !important;
@@ -320,12 +334,21 @@ RESIDENT_PROFILES = {
     }
 }
 
-# ---------- SESSION DATA INITIALIZATION ----------
+# ---------- PERSISTENT SESSION INITIALIZATION ----------
 if "incidents" not in st.session_state:
-    st.session_state.incidents = []
+    st.session_state.incidents = load_incidents()
 
 if "next_id" not in st.session_state:
-    st.session_state.next_id = 101
+    if st.session_state.incidents:
+        existing_ids = []
+        for item in st.session_state.incidents:
+            try:
+                existing_ids.append(int(item["ID"].replace("INC-", "")))
+            except ValueError:
+                pass
+        st.session_state.next_id = max(existing_ids) + 1 if existing_ids else 101
+    else:
+        st.session_state.next_id = 101
 
 def create_alert(resident_id, origin_loc, event, details, priority="High"):
     profile = RESIDENT_PROFILES.get(resident_id, RESIDENT_PROFILES["RES-8821"])
@@ -347,22 +370,22 @@ def create_alert(resident_id, origin_loc, event, details, priority="High"):
     }
     st.session_state.incidents.insert(0, incident)
     st.session_state.next_id += 1
+    save_incidents()
 
-# ---------- SINGLE-TRIGGER SLA ESCALATION LOGIC ----------
-needs_timer = False
-time_left = 10.0
-
+# ---------- NON-BLOCKING SLA ESCALATION LOGIC ----------
 now = datetime.now()
+has_escalated_change = False
+
 for inc in st.session_state.incidents:
     if inc["Status"] == "Awaiting response" and not inc.get("Dismissed", False):
         elapsed = (now - inc["Timestamp"]).total_seconds()
-        if elapsed >= 10:
-            if not inc.get("Escalated", False):
-                inc["Escalated"] = True
-                inc["Priority"] = "CRITICAL (ESCALATED)"
-        else:
-            needs_timer = True
-            time_left = min(time_left, max(0.1, 10.0 - elapsed))
+        if elapsed >= 10 and not inc.get("Escalated", False):
+            inc["Escalated"] = True
+            inc["Priority"] = "CRITICAL (ESCALATED)"
+            has_escalated_change = True
+
+if has_escalated_change:
+    save_incidents()
 
 # ---------- 3D GLOSSY HEADER BUBBLE ----------
 st.markdown("""
@@ -435,7 +458,7 @@ with left:
         origin_name = st.selectbox(
             "📍 Resident's Current Location:",
             options=list(TOWNSHIP_LOCATIONS.keys()),
-            index=3  # Default to Recreational Park
+            index=3
         )
 
         tab_sos, tab_voice, tab_nav = st.tabs(["🚨 Emergency SOS", "🎙️ Voice Assistant", "🗺️ Safe Wayfinding Map"])
@@ -525,9 +548,9 @@ with left:
             ).add_to(nav_map)
 
             st_folium(
-                nav_map, 
-                height=280, 
-                width=None, 
+                nav_map,
+                height=280,
+                width=None,
                 use_container_width=True,
                 key="safe_nav_map",
                 returned_objects=[]
@@ -575,12 +598,12 @@ with right:
 
                         if selected_status != incident["Status"]:
                             incident["Status"] = selected_status
-                            # AUTOMATIC DISMISSAL ON RESOLUTION
                             if selected_status == "Resolved":
                                 incident["Dismissed"] = True
                                 st.toast(f"✅ Case {incident['ID']} marked Resolved & automatically cleared from queue!", icon="🟢")
                             else:
                                 st.toast(f"{incident['ID']} status updated to {selected_status}")
+                            save_incidents()
                             st.rerun()
 
         with tab_audit:
@@ -592,19 +615,23 @@ with right:
                 ]]
                 st.dataframe(audit_df, use_container_width=True, hide_index=True, height=220)
 
-                csv_data = audit_df.to_csv(index=False).encode("utf-8")
-                st.download_button(
-                    "📥 Export Full Audit Log (CSV)",
-                    data=csv_data,
-                    file_name=f"SafeTown_Audit_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                    mime="text/csv"
-                )
+                col_dl, col_clr = st.columns([1, 1])
+                with col_dl:
+                    csv_data = audit_df.to_csv(index=False).encode("utf-8")
+                    st.download_button(
+                        "📥 Export Full Audit Log (CSV)",
+                        data=csv_data,
+                        file_name=f"SafeTown_Audit_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                        mime="text/csv",
+                        use_container_width=True
+                    )
+                with col_clr:
+                    if st.button("🧹 Clear All Resolved Cases", use_container_width=True):
+                        st.session_state.incidents = [i for i in st.session_state.incidents if i["Status"] != "Resolved"]
+                        save_incidents()
+                        st.toast("Cleared all resolved cases from logs!")
+                        st.rerun()
             else:
                 st.caption("No historical records logged yet.")
 
 st.caption("ℹ️ *SafeTown Prototype: All emergency payloads, fall detection events, and wayfinding data are simulated software events.*")
-
-# ---------- EXECUTE SINGLE TIMER RERUN FOR SLA ----------
-if needs_timer:
-    time.sleep(time_left)
-    st.rerun()
